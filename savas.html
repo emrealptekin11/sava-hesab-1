@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Savaş Hesaplayıcı</title>
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--tx:#1d1d1b;--mut:#6b6b66;--ac:#8a2b1f;--bd:#ddd8cc;--ok:#1f7a3a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--card:#222226;--tx:#eeeae0;--mut:#9a9a94;--ac:#e0705f;--bd:#37373d;--ok:#5fcf80;color-scheme:dark}}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px}
+.w{max-width:600px;margin:0 auto}
+h1{font-size:1.3rem;margin:4px 0}
+p.s{color:var(--mut);margin:0 0 14px;font-size:.9rem}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+h2{font-size:.95rem;margin:0 0 10px}
+label{display:block;font-size:.82rem;color:var(--mut);margin:8px 0 3px}
+input,select{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font-size:1rem;font-family:inherit}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.g label{margin:0 0 2px}
+button{width:100%;padding:13px;border:0;border-radius:10px;background:var(--ac);color:#fff;font-size:1rem;font-weight:600;cursor:pointer}
+.note{font-size:.8rem;color:var(--mut);margin-top:8px}
+.sc{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.86rem}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--bd);white-space:nowrap}
+th{color:var(--mut);font-size:.76rem}
+.win{color:var(--ok);font-weight:700}
+.lose{color:var(--ac);font-weight:700}
+.big{font-size:1.3rem;font-weight:700}
+.warn{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:8px;font-size:.8rem;color:var(--mut);margin-bottom:10px}
+</style>
+</head>
+<body>
+<div class="w">
+<h1>🛡️ Savaş Hesaplayıcı</h1>
+<p class="s">Casusun gördüğü askerleri gir, kaç askerle yeneceğini ve ne kadar kayıp vereceğini göster.</p>
+<div class="warn">Kayıp formülü ve savunma hesabı gerçek bir raporla uyuştu (güç oranı 2,33, düşman geliştirmesi ≈ Sv9 varsayımıyla). Tek rapor olduğu için yeni raporlarla karşılaştır, "Güç oranı"nı oyunla kıyasla.</div>
+
+<div class="c">
+<h2>1. Düşmanın savunması (casus raporu)</h2>
+<label>Düşman hanedanlığı</label>
+<select id="ed" onchange="rd('e')"><option>Hun</option><option>Göktürk</option><option>Selçuklu</option></select>
+<div class="g" id="eu" style="margin-top:10px"></div>
+<div class="g" style="margin-top:10px">
+<div><label>Düşman sur seviyesi</label><select id="sur"></select></div>
+<div><label>Düşman savunma geliştirmesi (bilmiyorsan 0)</label><select id="eup"></select></div>
+</div>
+<p class="note">Sur: oyun her seviye için %5-%7 diyor. Hun %5 (Sv10 = %50, doğrulandı), Göktürk %7 (raporla uyumlu çıktı), Selçuklu %6 (tahmin). Geliştirme: her seviye %2 (Sv10 = %20). Düşmanın geliştirmesini bilmediğimiz için sonuçta 0, 5 ve 10 seviye senaryoları da gösterilir.</p>
+<label>Düzeltme çarpanı (normalde 1, dokunma)</label>
+<input id="bn" type="number" step="0.01" value="1">
+</div>
+
+<div class="c">
+<h2>2. Benim ordum</h2>
+<label>Benim hanedanlığım</label>
+<select id="md" onchange="rd('m')"><option>Hun</option><option>Göktürk</option><option>Selçuklu</option></select>
+<p class="note">Her birimin altında o birimin <b>saldırı geliştirme</b> seviyesini seç (Kışla/Ahır → Geliştir ekranında yazıyor). İstersen göndereceğin orduyu da yaz, boşsa sadece "kaç asker gerekir" tablosu çıkar.</p>
+<div class="g" id="mu" style="margin-top:10px"></div>
+</div>
+
+<button onclick="hesapla()">Hesapla</button>
+
+<div class="c" id="out" style="margin-top:12px;display:none">
+<div id="res"></div>
+<div id="sc"></div>
+<h2 style="margin-top:14px">Tek tür askerle kaç tane gerekir?</h2>
+<div class="sc"><table><thead><tr><th>Asker</th><th>Saldırı</th><th>Yeter</th><th>Kayıp ≈%30</th><th>Kayıp ≈%10</th></tr></thead><tbody id="tb"></tbody></table></div>
+<p class="note" id="nt"></p>
+</div>
+</div>
+
+<script>
+var U={
+"Hun":[["Çerik","y",25,20,20],["Yaycı","y",25,50,20],["Süngülü","y",30,15,55],["Baltacı","y",90,30,35],["Tuğlu","a",35,50,85],["Tulpar","a",100,60,35],["Bahadır","a",175,65,55]],
+"Göktürk":[["Kalkanlı","y",10,35,20],["Sadakçı","y",15,65,20],["Gönderli","y",15,25,75],["Tolgalı","y",80,55,35],["Kuyaklı","a",35,110,40],["Çapar","a",90,60,60],["Tigin","a",140,90,90]],
+"Selçuklu":[["Ahi","y",20,25,20],["Tirendaz","y",20,55,20],["Harbeci","y",25,20,60],["Candar","y",75,50,40],["Yasavul","a",25,50,100],["Akıncı","a",50,90,60],["Hassa Atlısı","a",150,85,70]],
+"Ortak":[["Mancınık","y",40,15,15],["Top","y",70,20,20]]};
+var L={e:[],m:[]};
+var UP="";for(var q=0;q<=10;q++)UP+='<option value="'+q+'">Saldırı gel. '+q+' (+%'+(q*2)+')</option>';
+function opts(n,f){var h="";for(var i=0;i<=n;i++)h+='<option value="'+i+'">'+f(i)+'</option>';return h}
+function rd(k){
+var dn=document.getElementById(k+"d").value;
+L[k]=U[dn].concat(U.Ortak);
+var h="";L[k].forEach(function(u,i){
+ h+='<div><label>'+u[0]+'</label><input id="'+k+i+'" type="number" inputmode="numeric" min="0" placeholder="0">'+(k==="m"?'<select id="g'+i+'" style="margin-top:4px;padding:6px;font-size:.85rem">'+UP+'</select>':'')+'</div>'});
+document.getElementById(k+"u").innerHTML=h}
+function cnt(k){return L[k].map(function(u,i){return +document.getElementById(k+i).value||0})}
+function hesapla(){
+var ec=cnt("e"),mc=cnt("m");
+var sur=+document.getElementById("sur").value||0, eu=+document.getElementById("eup").value||0, cal=+document.getElementById("bn").value||1;
+var Dy=0,Da=0;L.e.forEach(function(u,i){Dy+=ec[i]*u[3];Da+=ec[i]*u[4]});
+var Ay=0,Ac=0,gm=[];
+L.m.forEach(function(u,i){var gl=+document.getElementById("g"+i).value||0;gm[i]=1+0.02*gl;var a=mc[i]*u[2]*gm[i];if(u[1]==="y")Ay+=a;else Ac+=a});
+var A=Ay+Ac;
+var SR={"Hun":0.05,"Göktürk":0.07,"Selçuklu":0.06};
+function mul(e){return (1+SR[document.getElementById("ed").value]*sur)*(1+0.02*e)*cal}
+function dEff(e){return A>0?((Ay/A)*Dy+(Ac/A)*Da)*mul(e):0}
+var res="",sc="";
+if(A>0){
+ var D=dEff(eu);
+ if(D<=0){res='<div class="big win">Düşmanda savunma yok</div>'}
+ else{
+ var r=A/D;
+ res+='<div class="note">Saldırı gücün <b>'+Math.round(A)+'</b>, düşman savunması <b>'+Math.round(D)+'</b>, güç oranı <b>'+r.toFixed(2)+'</b></div>';
+ if(r>1){var f=Math.pow(1/r,1.5);
+  var ls=L.m.map(function(u,i){return mc[i]?u[0]+": "+Math.round(mc[i]*f)+" / "+mc[i]:""}).filter(Boolean).join(", ");
+  res+='<div class="big win" style="margin-top:6px">✔ Kazanırsın, tahmini kayıp %'+Math.round(f*100)+'</div><div class="note">'+ls+'</div>'}
+ else{var f2=Math.pow(r,1.5);
+  var el=L.e.map(function(u,i){return ec[i]?u[0]+": "+Math.round(ec[i]*f2)+" / "+ec[i]:""}).filter(Boolean).join(", ");
+  res+='<div class="big lose" style="margin-top:6px">✘ Kaybedersin, askerlerinin hepsi ölür</div><div class="note">Düşmanın tahmini kaybı %'+Math.round(f2*100)+': '+el+'</div>'}
+ sc='<h2 style="margin-top:14px">Düşmanın savunma geliştirmesi şu kadarsa</h2><div class="sc"><table><thead><tr><th>Düşman gel.</th><th>Güç oranı</th><th>Sonuç</th></tr></thead><tbody>';
+ [0,5,10].forEach(function(e){var d=dEff(e),rr=A/d,t=rr>1?'<span class="win">Kazanırsın, kayıp %'+Math.round(Math.pow(1/rr,1.5)*100)+'</span>':'<span class="lose">Kaybedersin (düşman kaybı %'+Math.round(Math.pow(rr,1.5)*100)+')</span>';
+  sc+='<tr><td>Sv '+e+' (+%'+(e*2)+')</td><td>'+rr.toFixed(2)+'</td><td>'+t+'</td></tr>'});
+ sc+='</tbody></table></div>'}
+}
+document.getElementById("res").innerHTML=res;
+document.getElementById("sc").innerHTML=sc;
+var tb="";
+L.m.forEach(function(u,i){
+ var a=u[2]*gm[i];if(a<=0)return;
+ var Dt=(u[1]==="y"?Dy:Da)*mul(eu);
+ if(Dt<=0){tb+='<tr><td>'+u[0]+'</td><td>'+a.toFixed(1)+'</td><td colspan="3">Savunma yok</td></tr>';return}
+ var n=Math.floor(Dt/a)+1,n30=Math.ceil(Dt*Math.pow(0.3,-2/3)/a),n10=Math.ceil(Dt*Math.pow(0.1,-2/3)/a);
+ tb+='<tr><td>'+u[0]+'</td><td>'+a.toFixed(1)+'</td><td>'+n+'</td><td>'+n30+'</td><td>'+n10+'</td></tr>'});
+document.getElementById("tb").innerHTML=tb;
+document.getElementById("nt").textContent="Kayıp formülü doğrulandı: kazanan (1÷güç oranı)^1,5 oranında kayıp verir ve her birimden aynı yüzdeyi kaybeder. Savunma gücünün yaya/atlı karışımı varsayımdır. Tahminler eksik çıkabilir, fazladan asker gönder.";
+document.getElementById("out").style.display="block"}
+document.getElementById("sur").innerHTML=opts(10,function(i){return "Sur "+i});
+document.getElementById("eup").innerHTML=opts(10,function(i){return "Sv "+i+" (+%"+(i*2)+")"});
+rd("e");rd("m");
+</script>
+</body>
+</html>
