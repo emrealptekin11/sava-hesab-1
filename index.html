@@ -26,6 +26,9 @@ th{color:var(--mut);font-size:.76rem}
 .win{color:var(--ok);font-weight:700}
 .lose{color:var(--ac);font-weight:700}
 .big{font-size:1.3rem;font-weight:700}
+button.sec{background:transparent;color:var(--ac);border:1px dashed var(--ac);margin-top:10px;padding:10px;font-size:.9rem}
+button.rm{grid-column:1/-1;background:transparent;color:var(--mut);border:1px solid var(--bd);padding:6px;font-size:.8rem;font-weight:400}
+.sr{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;border:1px solid var(--bd);border-radius:10px;padding:8px;margin-top:8px}
 .warn{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:8px;font-size:.8rem;color:var(--mut);margin-bottom:10px}
 </style>
 </head>
@@ -40,6 +43,9 @@ th{color:var(--mut);font-size:.76rem}
 <label>Düşman hanedanlığı</label>
 <select id="ed" onchange="rd('e')"><option>Hun</option><option>Göktürk</option><option>Selçuklu</option></select>
 <div class="g" id="eu" style="margin-top:10px"></div>
+<div id="es"></div>
+<button class="sec" onclick="addS('e')">+ Düşmana gelen destek ekle</button>
+<p class="note">Düşmanın birlik arkadaşları savunmaya asker yolladıysa buraya ekle. Destek askerinin hanedanlığı farklı olabilir.</p>
 <div class="g" style="margin-top:10px">
 <div><label>Düşman sur seviyesi</label><select id="sur"></select></div>
 <div><label>Düşman savunma geliştirmesi (bilmiyorsan 0)</label><select id="eup"></select></div>
@@ -55,6 +61,9 @@ th{color:var(--mut);font-size:.76rem}
 <select id="md" onchange="rd('m')"><option>Hun</option><option>Göktürk</option><option>Selçuklu</option></select>
 <p class="note">Her birimin altında o birimin <b>saldırı geliştirme</b> seviyesini seç (Kışla/Ahır → Geliştir ekranında yazıyor). İstersen göndereceğin orduyu da yaz, boşsa sadece "kaç asker gerekir" tablosu çıkar.</p>
 <div class="g" id="mu" style="margin-top:10px"></div>
+<div id="ms"></div>
+<button class="sec" onclick="addS('m')">+ Bana gelen destek ekle</button>
+<p class="note">Birlik arkadaşların seninle birlikte saldırıya asker gönderiyorsa buraya ekle, her destek için saldırı geliştirme seviyesini ayrı seçebilirsin.</p>
 </div>
 
 <button onclick="hesapla()">Hesapla</button>
@@ -84,12 +93,30 @@ var h="";L[k].forEach(function(u,i){
  h+='<div><label>'+u[0]+'</label><input id="'+k+i+'" type="number" inputmode="numeric" min="0" placeholder="0">'+(k==="m"?'<select id="g'+i+'" style="margin-top:4px;padding:6px;font-size:.85rem">'+UP+'</select>':'')+'</div>'});
 document.getElementById(k+"u").innerHTML=h}
 function cnt(k){return L[k].map(function(u,i){return +document.getElementById(k+i).value||0})}
+var SN=0;
+function fu(sel,dn){sel.innerHTML=U[dn].concat(U.Ortak).map(function(u,i){return '<option value="'+i+'">'+u[0]+'</option>'}).join("")}
+function addS(k){
+ var d=document.createElement("div");d.className="sr";
+ var dn=document.getElementById(k+"d").value;
+ var dopt=["Hun","Göktürk","Selçuklu"].map(function(x){return '<option'+(x===dn?' selected':'')+'>'+x+'</option>'}).join("");
+ d.innerHTML='<div><label>Destek hanedanlığı</label><select class="sd">'+dopt+'</select></div><div><label>Asker</label><select class="su"></select></div><div><label>Adet</label><input class="sn" type="number" inputmode="numeric" min="0" placeholder="0"></div>'+(k==="m"?'<div><label>Saldırı geliştirme</label><select class="sg">'+UP+'</select></div>':'<div></div>')+'<button class="rm" onclick="this.parentNode.remove()">Sil</button>';
+ document.getElementById(k+"s").appendChild(d);
+ var sd=d.querySelector(".sd"),su=d.querySelector(".su");
+ fu(su,sd.value);sd.onchange=function(){fu(su,sd.value)}}
+function sup(k){return Array.prototype.map.call(document.querySelectorAll("#"+k+"s .sr"),function(r){
+ var u=(U[r.querySelector(".sd").value].concat(U.Ortak))[+r.querySelector(".su").value];
+ var g=r.querySelector(".sg");
+ return {u:u,c:+r.querySelector(".sn").value||0,gl:g?(+g.value||0):0}})}
 function hesapla(){
 var ec=cnt("e"),mc=cnt("m");
 var sur=+document.getElementById("sur").value||0, eu=+document.getElementById("eup").value||0, cal=+document.getElementById("bn").value||1;
-var Dy=0,Da=0;L.e.forEach(function(u,i){Dy+=ec[i]*u[3];Da+=ec[i]*u[4]});
+var EE=[],ME=[];
+L.e.forEach(function(u,i){EE.push({n:u[0],dy:u[3],da:u[4],c:ec[i]})});
+sup("e").forEach(function(s){EE.push({n:s.u[0]+" (destek)",dy:s.u[3],da:s.u[4],c:s.c})});
+var Dy=0,Da=0;EE.forEach(function(x){Dy+=x.c*x.dy;Da+=x.c*x.da});
 var Ay=0,Ac=0,gm=[];
-L.m.forEach(function(u,i){var gl=+document.getElementById("g"+i).value||0;gm[i]=1+0.02*gl;var a=mc[i]*u[2]*gm[i];if(u[1]==="y")Ay+=a;else Ac+=a});
+L.m.forEach(function(u,i){var gl=+document.getElementById("g"+i).value||0;gm[i]=1+0.02*gl;var a=mc[i]*u[2]*gm[i];if(u[1]==="y")Ay+=a;else Ac+=a;ME.push({n:u[0],c:mc[i]})});
+sup("m").forEach(function(s){var a=s.c*s.u[2]*(1+0.02*s.gl);if(s.u[1]==="y")Ay+=a;else Ac+=a;ME.push({n:s.u[0]+" (destek)",c:s.c})});
 var A=Ay+Ac;
 var SR={"Hun":0.05,"Göktürk":0.07,"Selçuklu":0.06};
 function mul(e){return (1+SR[document.getElementById("ed").value]*sur)*(1+0.02*e)*cal}
@@ -102,10 +129,10 @@ if(A>0){
  var r=A/D;
  res+='<div class="note">Saldırı gücün <b>'+Math.round(A)+'</b>, düşman savunması <b>'+Math.round(D)+'</b>, güç oranı <b>'+r.toFixed(2)+'</b></div>';
  if(r>1){var f=Math.pow(1/r,1.5);
-  var ls=L.m.map(function(u,i){return mc[i]?u[0]+": "+Math.round(mc[i]*f)+" / "+mc[i]:""}).filter(Boolean).join(", ");
+  var ls=ME.map(function(x){return x.c?x.n+": "+Math.round(x.c*f)+" / "+x.c:""}).filter(Boolean).join(", ");
   res+='<div class="big win" style="margin-top:6px">✔ Kazanırsın, tahmini kayıp %'+Math.round(f*100)+'</div><div class="note">'+ls+'</div>'}
  else{var f2=Math.pow(r,1.5);
-  var el=L.e.map(function(u,i){return ec[i]?u[0]+": "+Math.round(ec[i]*f2)+" / "+ec[i]:""}).filter(Boolean).join(", ");
+  var el=EE.map(function(x){return x.c?x.n+": "+Math.round(x.c*f2)+" / "+x.c:""}).filter(Boolean).join(", ");
   res+='<div class="big lose" style="margin-top:6px">✘ Kaybedersin, askerlerinin hepsi ölür</div><div class="note">Düşmanın tahmini kaybı %'+Math.round(f2*100)+': '+el+'</div>'}
  sc='<h2 style="margin-top:14px">Düşmanın savunma geliştirmesi şu kadarsa</h2><div class="sc"><table><thead><tr><th>Düşman gel.</th><th>Güç oranı</th><th>Sonuç</th></tr></thead><tbody>';
  [0,5,10].forEach(function(e){var d=dEff(e),rr=A/d,t=rr>1?'<span class="win">Kazanırsın, kayıp %'+Math.round(Math.pow(1/rr,1.5)*100)+'</span>':'<span class="lose">Kaybedersin (düşman kaybı %'+Math.round(Math.pow(rr,1.5)*100)+')</span>';
